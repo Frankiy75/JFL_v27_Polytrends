@@ -238,49 +238,18 @@ namespace cAlgo.Robots.JFL_v27_Polytrend
             {
                 var start = pivots[i];
                 var end = pivots[i + 1];
-                bool bullish = !start.IsHigh && end.IsHigh;
                 double range = Math.Abs(end.Price - start.Price);
                 double atr = GetAtrAt(bars, end.Time, range);
                 double strength = atr > 0 ? range / atr : 0;
 
-                // A trend either extends the prior same-side structural extreme
-                // or retraces a meaningful share of the preceding trend. This
-                // intentionally discards small internal ZigZag noise.
-                bool breaksStructure = i == 0 || (bullish
-                    ? end.Price > pivots[i - 1].Price
-                    : end.Price < pivots[i - 1].Price);
-                double previousRange = i > 0
-                    ? Math.Abs(pivots[i].Price - pivots[i - 1].Price)
-                    : 0;
-                bool meaningfulRetracement = previousRange > 0 &&
-                    range / previousRange >= _minimumRetracementRatio;
-
-                // A break of the prior same-side extreme is structural in any
-                // timeframe. Do not discard it just because a single global
-                // ATR threshold is too demanding on Daily/Weekly data. The
-                // threshold still filters internal retracements that did not
-                // make a structural break.
-                bool isStructuralLeg = breaksStructure ||
-                    (meaningfulRetracement && strength >= _minimumLegAtr);
-                if (isStructuralLeg)
-                    selected.Add(new LegSelection
-                    {
-                        StartIndex = i,
-                        StrengthAtr = strength,
-                        SourceAtr = atr
-                    });
-            }
-
-            // Never leave the chart without a current trend merely because a
-            // quiet market has not yet met the configured displacement.
-            if (selected.Count == 0)
-            {
-                int latest = pivots.Count - 2;
+                // Every confirmed ZigZag leg owns a pair.  Structural
+                // relevance is evaluated later, when deciding brightness and
+                // visibility; it must not erase the pair's origin or levels.
                 selected.Add(new LegSelection
                 {
-                    StartIndex = latest,
-                    StrengthAtr = 1.0,
-                    SourceAtr = Math.Abs(pivots[latest + 1].Price - pivots[latest].Price)
+                    StartIndex = i,
+                    StrengthAtr = strength,
+                    SourceAtr = atr
                 });
             }
             return selected;
