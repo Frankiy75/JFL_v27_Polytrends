@@ -634,10 +634,9 @@ namespace cAlgo.Robots.JFL_v27_Polytrend.JFL_v27_Polytrend
             var visible = new PairVisibility();
             if (levels == null) return visible;
             visible.RawPivotCount = levels.Count;
-            DateTime drawFrom = isMtf ? _mtfVertLineDate : _vertLineDate;
-            var drawableLevels = drawFrom == DateTime.MinValue
-                ? levels
-                : levels.Where(level => level.PivotTime >= drawFrom).ToList();
+            // The F/G line is a chart guide.  It must never determine which
+            // trends or levels the engine is allowed to retain.
+            var drawableLevels = levels;
             if (pairs == null || pairs.Count == 0)
             {
                 visible.Levels = FilterLevels(drawableLevels, isMtf);
@@ -647,14 +646,8 @@ namespace cAlgo.Robots.JFL_v27_Polytrend.JFL_v27_Polytrend
 
             double price = Symbol.Bid;
             double atr = CalculateAtr();
-            // The vertical line is the beginning of the visual study. A pair
-            // already completed to its left is omitted in full, rather than
-            // being clipped or allowed to leak its labels into the chart.
             var datedPairs = pairs
                 .Where(p => p.Support != null && p.Resistance != null)
-                // The F/G vertical line hides historical pair levels, but the
-                // dotted main leg remains visible as directional context.
-                .Where(p => drawFrom == DateTime.MinValue || p.EndTime >= drawFrom || p.IsMainTrendSegment)
                 .ToList();
             visible.RawPairCount = pairs.Count;
             visible.AfterVerticalCount = datedPairs.Count;
@@ -692,29 +685,24 @@ namespace cAlgo.Robots.JFL_v27_Polytrend.JFL_v27_Polytrend
                 .OrderByDescending(p => p.RelevanceScore)
                 .Take(belowQuota);
 
-            // Tier 1: the two PolyBounds control references and a pair that
-            // contains price. These are the small, actionable families seen
-            // around price in Polytrends, and are never displaced by a newer
-            // but less meaningful swing.
+            // Tier 1 is made of structural controls, not whatever pair merely
+            // happens to be nearest to the current quote.  This lets an older
+            // active trend retain its identity as price rotates around it.
             var controls = datedPairs.Where(p => p.IsPolyBoundsReference);
-            var straddling = datedPairs
-                .Where(p => p.Support.LinePrice <= price && p.Resistance.LinePrice >= price)
-                .OrderBy(p => PairDistance(p, price)).Take(1);
-            var nearPrice = datedPairs
-                .Where(p => PairDistance(p, price) <= GetPairAtr(p, atr) * HighlightNearPriceAtr)
-                .OrderByDescending(p => p.RelevanceScore)
-                .ThenBy(p => PairDistance(p, price)).Take(2);
-            var required = controls.Concat(straddling).Concat(nearPrice)
+            var currentStructure = datedPairs.Where(p => p.IsTrendOfRelevance ||
+                p.IsImmediateStructure || p.IsProgressionContext);
+            var required = controls.Concat(currentStructure)
                 .GroupBy(p => p.PairId)
                 .Select(g => g.First())
                 .ToList();
 
-            // Tier 2: use any remaining capacity for strong, still-active
-            // macro pairs. Recent pairs are context only, never mandatory.
+            // Tier 2 fills the remaining slots with confirmed active trends
+            // and the best structural levels on either side of price.
             var candidates = above.Concat(below)
                 .Concat(datedPairs.Where(p => p.IsTrendActive)
                     .OrderByDescending(p => p.RelevanceScore).Take(MaxVisiblePairs))
-                .Concat(datedPairs.Where(p => p.IsImmediateStructure || p.IsTrendOfRelevance))
+                .Concat(datedPairs.Where(p => p.LifecycleState == PairLifecycleState.SupportLostAwaitingRetest ||
+                    p.LifecycleState == PairLifecycleState.ResistanceGainedAwaitingRetest))
                 .Concat(datedPairs.OrderByDescending(p => p.EndTime).Take(AlwaysShowRecentPairs))
                 .GroupBy(p => p.PairId).Select(g => g.First())
                 .OrderByDescending(p => p.RelevanceScore)
@@ -778,7 +766,7 @@ namespace cAlgo.Robots.JFL_v27_Polytrend.JFL_v27_Polytrend
             if (visible.Levels.Count == 0)
                 visible.Levels = FilterLevels(drawableLevels, isMtf);
             visible.Diagnostics = $"pivotes {visible.RawPivotCount} | pares {visible.RawPairCount} | " +
-                $"F/G {visible.AfterVerticalCount} | válidos {visible.BasicEligibleCount} | " +
+                $"F/G guía | válidos {visible.BasicEligibleCount} | " +
                 $"sin apilar {visible.AfterStackCount} | visibles {visible.BrightPairCount} | líneas {visible.Levels.Count}";
             return visible;
         }

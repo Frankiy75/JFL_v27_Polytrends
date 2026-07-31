@@ -295,22 +295,37 @@ namespace cAlgo.Robots.JFL_v27_Polytrend
         private static Dictionary<string, Color> AssignPairColors(List<PolytrendPair> pairs)
         {
             var colors = new Dictionary<string, Color>();
-            for (int i = 0; i < pairs.Count; i++)
+            foreach (var pair in pairs)
             {
-                Color baseColor = PairPalette[i % PairPalette.Length];
-                colors[pairs[i].PairId] = Color.FromArgb(pairs[i].VisualOpacity,
+                Color baseColor = PairPalette[GetStablePaletteIndex(pair.PairId)];
+                colors[pair.PairId] = Color.FromArgb(pair.VisualOpacity,
                     baseColor.R, baseColor.G, baseColor.B);
             }
             return colors;
+        }
+
+        private static int GetStablePaletteIndex(string pairId)
+        {
+            // String.GetHashCode is intentionally randomized between .NET
+            // processes.  A small deterministic hash keeps a trend's colour
+            // attached to the same pair after every redraw and TF refresh.
+            unchecked
+            {
+                int hash = 17;
+                foreach (char character in pairId ?? string.Empty)
+                    hash = hash * 31 + character;
+                return (hash & 0x7fffffff) % PairPalette.Length;
+            }
         }
 
         private static Dictionary<string, Color> GetLevelColors(List<PolytrendPair> pairs,
             Dictionary<string, Color> pairColors)
         {
             var colors = new Dictionary<string, Color>();
-            foreach (var pair in pairs)
+            foreach (var pair in pairs.OrderBy(p => p.PairId, StringComparer.Ordinal))
             {
-                // Pairs are ordered by relevance; the first one owns a shared pivot's colour.
+                // A shared pivot must keep the same owner-colour even when
+                // relevance or price-distance reorders the visible list.
                 if (!colors.ContainsKey(pair.Support.LevelId))
                     colors[pair.Support.LevelId] = pairColors[pair.PairId];
                 if (!colors.ContainsKey(pair.Resistance.LevelId))
