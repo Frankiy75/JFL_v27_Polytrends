@@ -211,9 +211,6 @@ namespace cAlgo.Robots.JFL_v27_Polytrend.JFL_v27_Polytrend
         [Parameter("Max Visible Pairs", Group = "Pair Focus", DefaultValue = 8, MinValue = 1, MaxValue = 20)]
         public int MaxVisiblePairs { get; set; }
 
-        [Parameter("Max ZigZag Connectors", Group = "Pair Focus", DefaultValue = 3, MinValue = 0, MaxValue = 20)]
-        public int MaxZigZagConnectors { get; set; }
-
         [Parameter("Use Timeframe Profiles", Group = "Timeframe Profiles", DefaultValue = false)]
         public bool UseTimeframeProfiles { get; set; }
 
@@ -370,7 +367,7 @@ namespace cAlgo.Robots.JFL_v27_Polytrend.JFL_v27_Polytrend
             _scanner          = new PolytrendScanner(MinimumPolytrendLegAtr,
                 MinimumPolytrendRetracementPercent);
             _lineManager      = new PolytrendLineManager(this, UntestedLineWidth, TestedLineWidth);
-            _lineManager.SetVisualOptions(ClassicMode, OldPairStubAfterBars, MaxZigZagConnectors);
+            _lineManager.SetVisualOptions(ClassicMode, OldPairStubAfterBars);
             _zigZagLineManager = new ZigZagLineManager(this);
             _touchDetector    = new LineTouchDetector(Symbol, TestedLineOffsetPips);
             _stateEngine      = new PolytrendStateEngine(Symbol, UseWicksForGainsLosses, StateChangeOffsetPips);

@@ -16,7 +16,6 @@ namespace cAlgo.Robots.JFL_v27_Polytrend
         private readonly int _testedLineWidth;
         private bool _classicMode;
         private int _oldPairStubBars;
-        private int _maxZigZagConnectors = 3;
         private readonly Dictionary<string, int> _pairColorIndices = new Dictionary<string, int>();
         private static readonly Color[] PairPalette =
         {
@@ -46,11 +45,10 @@ namespace cAlgo.Robots.JFL_v27_Polytrend
             _mtfZigZag = mtfZigZag;
         }
 
-        public void SetVisualOptions(bool classicMode, int oldPairStubBars, int maxZigZagConnectors)
+        public void SetVisualOptions(bool classicMode, int oldPairStubBars)
         {
             _classicMode = classicMode;
             _oldPairStubBars = oldPairStubBars;
-            _maxZigZagConnectors = Math.Max(0, maxZigZagConnectors);
         }
 
         public void ClearTimeFrame(string timeframe)
@@ -76,9 +74,6 @@ namespace cAlgo.Robots.JFL_v27_Polytrend
             var visiblePairs = GetVisiblePairs(levels, pairs);
             var pairColors = AssignPairColors(visiblePairs);
             var levelColors = GetLevelColors(visiblePairs, pairColors);
-            var connectorPairIds = new HashSet<string>(visiblePairs
-                .Take(_maxZigZagConnectors)
-                .Select(p => p.PairId));
 
             int count = 0;
             foreach (var level in levels.OrderByDescending(l => l.PivotTime))
@@ -88,7 +83,7 @@ namespace cAlgo.Robots.JFL_v27_Polytrend
 
             foreach (var pair in visiblePairs)
                 DrawPairConnector(pair, timeframe, $"{_prefix}{timeframe}_pair_{pair.PairId}",
-                    pairColors[pair.PairId], vertLineDate, connectorPairIds.Contains(pair.PairId));
+                    pairColors[pair.PairId], vertLineDate);
         }
 
         public void DrawMtfPool(List<PolytrendResult> levels, IEnumerable<string> mtfNames,
@@ -112,10 +107,6 @@ namespace cAlgo.Robots.JFL_v27_Polytrend
             if (pairs != null && pairs.Count > 0)
             {
                 var pairColors = AssignPairColors(pairs.OrderBy(p => DistanceToPair(p, _robot.Symbol.Bid)).ToList());
-                var connectorPairIds = new HashSet<string>(pairs
-                    .OrderBy(p => DistanceToPair(p, _robot.Symbol.Bid))
-                    .Take(_maxZigZagConnectors)
-                    .Select(p => p.PairId));
                 var pairCounters = new Dictionary<string, int>();
                 foreach (var pair in pairs.OrderBy(p => DistanceToPair(p, _robot.Symbol.Bid)))
                 {
@@ -128,8 +119,7 @@ namespace cAlgo.Robots.JFL_v27_Polytrend
 
                     DrawMtfLevel(pair.Support, tf, $"{baseName}_support", pairColor, labelTime, vertLineDate);
                     DrawMtfLevel(pair.Resistance, tf, $"{baseName}_resistance", pairColor, labelTime, vertLineDate);
-                    DrawPairConnector(pair, tf, baseName, pairColor, vertLineDate,
-                        connectorPairIds.Contains(pair.PairId));
+                    DrawPairConnector(pair, tf, baseName, pairColor, vertLineDate);
                 }
                 return;
             }
@@ -211,7 +201,7 @@ namespace cAlgo.Robots.JFL_v27_Polytrend
         }
 
         private void DrawPairConnector(PolytrendPair pair, string timeframe, string baseName, Color color,
-            DateTime vertLineDate, bool drawZigZagLeg)
+            DateTime vertLineDate)
         {
             if (pair?.Support == null || pair.Resistance == null)
                 return;
@@ -234,10 +224,9 @@ namespace cAlgo.Robots.JFL_v27_Polytrend
 
             // The coloured leg follows the real ZigZag pivots, clipped at the
             // user-selected vertical boundary; the short marks remain body S/R.
-            if (drawZigZagLeg)
-                _robot.Chart.DrawTrendLine($"{baseName}_leg",
-                    legStartTime, legStartPrice, legEndTime, legEndPrice,
-                    connectorColor, GetPairThickness(pair), pair.IsMainTrendSegment ? LineStyle.Dots : LineStyle.Solid);
+            _robot.Chart.DrawTrendLine($"{baseName}_leg",
+                legStartTime, legStartPrice, legEndTime, legEndPrice,
+                connectorColor, GetPairThickness(pair), pair.IsMainTrendSegment ? LineStyle.Dots : LineStyle.Solid);
 
             // Longer horizontal marks keep each structural level readable at the
             // candle that generated it.
