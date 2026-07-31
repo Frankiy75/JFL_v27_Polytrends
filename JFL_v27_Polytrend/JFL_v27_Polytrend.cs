@@ -123,6 +123,9 @@ namespace cAlgo.Robots.JFL_v27_Polytrend.JFL_v27_Polytrend
         [Parameter("MTF Draw From Date (yyyy-MM-dd)", Group = "Vertical Lines", DefaultValue = "")]
         public string MtfDrawFromDateStr { get; set; }
 
+        [Parameter("F/G Filters Historical Pairs", Group = "Vertical Lines", DefaultValue = true)]
+        public bool FilterHistoricalPairsAtVertical { get; set; }
+
         // --- TESTED LINES ---
         [Parameter("Tested Line Offset (pips)", Group = "Tested Lines", DefaultValue = 0.5, MinValue = 0, MaxValue = 10)]
         public double TestedLineOffsetPips { get; set; }
@@ -634,9 +637,11 @@ namespace cAlgo.Robots.JFL_v27_Polytrend.JFL_v27_Polytrend
             var visible = new PairVisibility();
             if (levels == null) return visible;
             visible.RawPivotCount = levels.Count;
-            // The F/G line is a chart guide.  It must never determine which
-            // trends or levels the engine is allowed to retain.
-            var drawableLevels = levels;
+            DateTime drawFrom = isMtf ? _mtfVertLineDate : _vertLineDate;
+            bool applyVerticalFilter = FilterHistoricalPairsAtVertical && drawFrom != DateTime.MinValue;
+            var drawableLevels = applyVerticalFilter
+                ? levels.Where(level => level.PivotTime >= drawFrom).ToList()
+                : levels;
             if (pairs == null || pairs.Count == 0)
             {
                 visible.Levels = FilterLevels(drawableLevels, isMtf);
@@ -648,6 +653,9 @@ namespace cAlgo.Robots.JFL_v27_Polytrend.JFL_v27_Polytrend
             double atr = CalculateAtr();
             var datedPairs = pairs
                 .Where(p => p.Support != null && p.Resistance != null)
+                // F/G is the beginning of the study: a completed pair to its
+                // left cannot leak either level or connector into the chart.
+                .Where(p => !applyVerticalFilter || p.EndTime >= drawFrom)
                 .ToList();
             visible.RawPairCount = pairs.Count;
             visible.AfterVerticalCount = datedPairs.Count;
@@ -656,7 +664,7 @@ namespace cAlgo.Robots.JFL_v27_Polytrend.JFL_v27_Polytrend
                 foreach (var pair in datedPairs) { pair.IsBright = true; pair.VisualOpacity = 255; }
                 visible.Pairs = datedPairs;
                 var allIds = new HashSet<string>(datedPairs.SelectMany(p => new[] { p.Support.LevelId, p.Resistance.LevelId }));
-                visible.Levels = drawableLevels.Where(l => allIds.Contains(l.LevelId)).ToList();
+                visible.Levels = levels.Where(l => allIds.Contains(l.LevelId)).ToList();
                 visible.BasicEligibleCount = datedPairs.Count;
                 visible.AfterStackCount = datedPairs.Count;
                 visible.BrightPairCount = datedPairs.Count;
@@ -760,13 +768,16 @@ namespace cAlgo.Robots.JFL_v27_Polytrend.JFL_v27_Polytrend
                 .SelectMany(p => new[] { p.Support.LevelId, p.Resistance.LevelId }));
             foreach (var macroLevel in GetMacroLevels(datedPairs, price))
                 visibleIds.Add(macroLevel.LevelId);
-            visible.Levels = drawableLevels.Where(l => visibleIds.Contains(l.LevelId)).ToList();
+            // A pair that crosses F/G keeps both members. Their historical
+            // origin remains cropped by the renderer, but its support or
+            // resistance ray remains logically complete from the boundary.
+            visible.Levels = levels.Where(l => visibleIds.Contains(l.LevelId)).ToList();
 
             // A single unpaired pivot is uncommon but should still be rendered.
             if (visible.Levels.Count == 0)
                 visible.Levels = FilterLevels(drawableLevels, isMtf);
             visible.Diagnostics = $"pivotes {visible.RawPivotCount} | pares {visible.RawPairCount} | " +
-                $"F/G guía | válidos {visible.BasicEligibleCount} | " +
+                $"F/G {(applyVerticalFilter ? visible.AfterVerticalCount.ToString() : "guía")} | válidos {visible.BasicEligibleCount} | " +
                 $"sin apilar {visible.AfterStackCount} | visibles {visible.BrightPairCount} | líneas {visible.Levels.Count}";
             return visible;
         }
