@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>JFL_v27_Polytrend</AssemblyName>
+    <RootNamespace>cAlgo.Robots.JFL_v27_Polytrend</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="cTrader.Automate" Version="*" />
+  </ItemGroup>
+</Project>
