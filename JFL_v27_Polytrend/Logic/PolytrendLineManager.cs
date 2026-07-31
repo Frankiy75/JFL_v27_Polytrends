@@ -17,13 +17,19 @@ namespace cAlgo.Robots.JFL_v27_Polytrend
         private bool _classicMode;
         private int _oldPairStubBars;
         private int _maxZigZagConnectors = 3;
+        private readonly Dictionary<string, int> _pairColorIndices = new Dictionary<string, int>();
         private static readonly Color[] PairPalette =
         {
             Color.FromArgb(255,  70, 170, 255),
             Color.FromArgb(255, 255,  90, 180),
             Color.FromArgb(255, 255, 200,  60),
             Color.FromArgb(255,  85, 220, 150),
-            Color.FromArgb(255, 190, 120, 255)
+            Color.FromArgb(255, 190, 120, 255),
+            Color.FromArgb(255, 255, 145,  70),
+            Color.FromArgb(255,  65, 210, 210),
+            Color.FromArgb(255, 255, 105, 105),
+            Color.FromArgb(255, 165, 225,  70),
+            Color.FromArgb(255, 145, 150, 255)
         };
 
         public PolytrendLineManager(Robot robot, int untestedLineWidth = 1, int testedLineWidth = 1, string prefix = "PT_")
@@ -292,16 +298,58 @@ namespace cAlgo.Robots.JFL_v27_Polytrend
                 .ToList();
         }
 
-        private static Dictionary<string, Color> AssignPairColors(List<PolytrendPair> pairs)
+        private Dictionary<string, Color> AssignPairColors(List<PolytrendPair> pairs)
         {
             var colors = new Dictionary<string, Color>();
-            foreach (var pair in pairs)
+            var orderedPairs = pairs
+                .Where(pair => pair != null && !string.IsNullOrEmpty(pair.PairId))
+                .OrderByDescending(pair => pair.IsPrimary)
+                .ThenByDescending(pair => pair.IsBright)
+                .ThenBy(pair => pair.EndTime)
+                .ThenBy(pair => pair.PairId, StringComparer.Ordinal)
+                .ToList();
+            var usedIndices = new HashSet<int>();
+
+            // Preserve an already assigned colour when possible.  A second
+            // pass assigns a free nearby palette colour to any hash collision.
+            foreach (var pair in orderedPairs)
             {
-                Color baseColor = PairPalette[GetStablePaletteIndex(pair.PairId)];
-                colors[pair.PairId] = Color.FromArgb(pair.VisualOpacity,
-                    baseColor.R, baseColor.G, baseColor.B);
+                string key = GetPairColorKey(pair);
+                if (_pairColorIndices.TryGetValue(key, out int index) && usedIndices.Add(index))
+                    colors[pair.PairId] = WithOpacity(PairPalette[index], pair.VisualOpacity);
+            }
+
+            foreach (var pair in orderedPairs.Where(pair => !colors.ContainsKey(pair.PairId)))
+            {
+                int preferredIndex = GetStablePaletteIndex(GetPairColorKey(pair));
+                int index = FindFreePaletteIndex(preferredIndex, usedIndices);
+                _pairColorIndices[GetPairColorKey(pair)] = index;
+                usedIndices.Add(index);
+                colors[pair.PairId] = WithOpacity(PairPalette[index], pair.VisualOpacity);
             }
             return colors;
+        }
+
+        private static Color WithOpacity(Color color, int opacity)
+        {
+            return Color.FromArgb(opacity, color.R, color.G, color.B);
+        }
+
+        private static int FindFreePaletteIndex(int preferredIndex, HashSet<int> usedIndices)
+        {
+            for (int offset = 0; offset < PairPalette.Length; offset++)
+            {
+                int candidate = (preferredIndex + offset) % PairPalette.Length;
+                if (!usedIndices.Contains(candidate))
+                    return candidate;
+            }
+            // More pairs than palette colours: keep the deterministic colour.
+            return preferredIndex;
+        }
+
+        private static string GetPairColorKey(PolytrendPair pair)
+        {
+            return (pair.TimeframeName ?? string.Empty) + "|" + pair.PairId;
         }
 
         private static int GetStablePaletteIndex(string pairId)
