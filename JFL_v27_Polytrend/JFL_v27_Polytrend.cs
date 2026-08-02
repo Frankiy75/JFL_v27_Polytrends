@@ -274,8 +274,11 @@ namespace cAlgo.Robots.JFL_v27_Polytrend.JFL_v27_Polytrend
         [Parameter("ZigZag Color", Group = "Draw ZigZag", DefaultValue = "Gray")]
         public string ZigZagColorName { get; set; }
 
-        [Parameter("ZigZag Thickness", Group = "Draw ZigZag", DefaultValue = 1, MinValue = 1, MaxValue = 5)]
+        [Parameter("ZigZag Thickness", Group = "Draw ZigZag", DefaultValue = 3, MinValue = 1, MaxValue = 5)]
         public int ZigZagThickness { get; set; }
+
+        [Parameter("ZigZag Transparency (%)", Group = "Draw ZigZag", DefaultValue = 35, MinValue = 0, MaxValue = 90)]
+        public int ZigZagTransparency { get; set; }
 
         // --- COMPONENTES ---
         private MTFZigZagService _mtfZigZag;
@@ -318,7 +321,7 @@ namespace cAlgo.Robots.JFL_v27_Polytrend.JFL_v27_Polytrend
         {
             _supportColor    = Opaque(Color.FromName(SupportColorName));
             _resistanceColor = Opaque(Color.FromName(ResistanceColorName));
-            _zigZagColor     = Color.FromName(ZigZagColorName);
+            _zigZagColor     = WithTransparency(Color.FromName(ZigZagColorName), ZigZagTransparency);
             _vertLineColor   = Color.FromName(VertLineColorName);
             _mtfVertLineColor = Color.FromName(MtfVertLineColorName);
             _chartTfName     = TimeFrame.ToString();
@@ -455,6 +458,8 @@ namespace cAlgo.Robots.JFL_v27_Polytrend.JFL_v27_Polytrend
             Chart.KeyDown += OnChartKeyDown;
             Chart.MouseDown += OnChartMouseDown;
             Chart.Activated += OnChartActivated;
+            Chart.ScrollChanged += OnChartScrollChanged;
+            Chart.ZoomChanged += OnChartLabelZoomChanged;
 
             foreach (var tf in _timeframesToScan.Where(x => x.Value))
                 _mtfZigZag.InitializeTimeFrame(ParseTimeFrame(tf.Key));
@@ -601,6 +606,12 @@ namespace cAlgo.Robots.JFL_v27_Polytrend.JFL_v27_Polytrend
         }
 
         private static Color Opaque(Color c) => Color.FromArgb(255, c.R, c.G, c.B);
+
+        private static Color WithTransparency(Color color, int transparencyPercent)
+        {
+            int alpha = 255 * (100 - Math.Max(0, Math.Min(90, transparencyPercent))) / 100;
+            return Color.FromArgb(alpha, color.R, color.G, color.B);
+        }
 
         private List<PolytrendResult> FilterLevels(List<PolytrendResult> levels, bool isMtf = false)
         {
@@ -1138,6 +1149,16 @@ namespace cAlgo.Robots.JFL_v27_Polytrend.JFL_v27_Polytrend
             _swingMarker?.Update();
         }
 
+        private void OnChartLabelZoomChanged(ChartZoomEventArgs args)
+        {
+            RedrawAllLevels();
+        }
+
+        private void OnChartScrollChanged(ChartScrollEventArgs args)
+        {
+            RedrawAllLevels();
+        }
+
         private void OnSwingTimer()
         {
             _swingMarker?.Update();
@@ -1295,6 +1316,8 @@ namespace cAlgo.Robots.JFL_v27_Polytrend.JFL_v27_Polytrend
             Chart.KeyDown -= OnChartKeyDown;
             Chart.MouseDown -= OnChartMouseDown;
             Chart.Activated -= OnChartActivated;
+            Chart.ScrollChanged -= OnChartScrollChanged;
+            Chart.ZoomChanged -= OnChartLabelZoomChanged;
             if (SwingScreenMode)
             {
                 Chart.ZoomChanged -= OnChartZoomChanged;

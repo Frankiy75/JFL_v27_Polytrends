@@ -102,8 +102,6 @@ namespace cAlgo.Robots.JFL_v27_Polytrend
 
             if (levels == null) return;
 
-            double chartTfMins = GetTfMinutes(chartTfName);
-
             if (pairs != null && pairs.Count > 0)
             {
                 var pairColors = AssignPairColors(pairs.OrderBy(p => DistanceToPair(p, _robot.Symbol.Bid)).ToList());
@@ -113,12 +111,10 @@ namespace cAlgo.Robots.JFL_v27_Polytrend
                     string tf = pair.TimeframeName;
                     if (!pairCounters.ContainsKey(tf)) pairCounters[tf] = 0;
                     string baseName = $"{_prefix}{tf}_pair_{pairCounters[tf]++}";
-                    DateTime labelTime = _robot.Bars.OpenTimes.LastValue
-                        .AddMinutes(chartTfMins * (2 + GetTfRank(tf) * 2));
                     Color pairColor = pairColors[pair.PairId];
 
-                    DrawMtfLevel(pair.Support, tf, $"{baseName}_support", pairColor, labelTime, vertLineDate);
-                    DrawMtfLevel(pair.Resistance, tf, $"{baseName}_resistance", pairColor, labelTime, vertLineDate);
+                    DrawMtfLevel(pair.Support, tf, $"{baseName}_support", pairColor, vertLineDate);
+                    DrawMtfLevel(pair.Resistance, tf, $"{baseName}_resistance", pairColor, vertLineDate);
                     DrawPairConnector(pair, tf, baseName, pairColor, vertLineDate);
                 }
                 return;
@@ -131,14 +127,12 @@ namespace cAlgo.Robots.JFL_v27_Polytrend
                 if (!counters.ContainsKey(tf)) counters[tf] = 0;
                 string baseName = $"{_prefix}{tf}_{counters[tf]++}";
                 Color tfColor = GetTfColor(tf);
-                DateTime labelTime = _robot.Bars.OpenTimes.LastValue
-                    .AddMinutes(chartTfMins * (2 + GetTfRank(tf) * 2));
-                DrawMtfLevel(level, tf, baseName, tfColor, labelTime, vertLineDate);
+                DrawMtfLevel(level, tf, baseName, tfColor, vertLineDate);
             }
         }
 
         private void DrawMtfLevel(PolytrendResult level, string timeframe, string baseName,
-            Color lineColor, DateTime labelTime, DateTime vertLineDate)
+            Color lineColor, DateTime vertLineDate)
         {
             DateTime farRight = GetLineEndTime(level.PivotTime, timeframe);
             DateTime startTime = (vertLineDate != DateTime.MinValue && level.PivotTime < vertLineDate)
@@ -154,8 +148,8 @@ namespace cAlgo.Robots.JFL_v27_Polytrend
                 farRight,  level.LinePrice,
                 rayColor, lineWidth, style);
 
-            _robot.Chart.DrawText($"{baseName}_lbl", GetTimeframeStateText(level, timeframe),
-                labelTime, level.LinePrice, lineColor).FontSize = 9;
+            DrawRightEdgeLabel($"{baseName}_lbl", GetTimeframeStateText(level, timeframe),
+                level.LinePrice, lineColor, 9);
         }
 
         private void DrawLevel(PolytrendResult level, string timeframe, string baseName,
@@ -166,10 +160,6 @@ namespace cAlgo.Robots.JFL_v27_Polytrend
                 : Color.FromArgb(255, supportColor.R, supportColor.G, supportColor.B));
 
             double tfMins    = GetTfMinutes(timeframe);
-            double chartMins = GetTfMinutes(_robot.TimeFrame.ToString());
-            DateTime labelTime = _robot.Bars.OpenTimes.LastValue
-                .AddMinutes(chartMins * (2 + GetTfRank(timeframe) * 2));
-
             DateTime farRight = GetLineEndTime(level.PivotTime, timeframe);
             DateTime lineStart = (vertLineDate != DateTime.MinValue && level.PivotTime < vertLineDate)
                 ? vertLineDate : level.PivotTime;
@@ -196,8 +186,17 @@ namespace cAlgo.Robots.JFL_v27_Polytrend
                     lineColor, 2, LineStyle.Solid);
             }
 
-            _robot.Chart.DrawText($"{baseName}_lbl", GetTimeframeStateText(level, timeframe),
-                labelTime, level.LinePrice, lineColor).FontSize = 10;
+            DrawRightEdgeLabel($"{baseName}_lbl", GetTimeframeStateText(level, timeframe),
+                level.LinePrice, lineColor, 10);
+        }
+
+        private void DrawRightEdgeLabel(string name, string text, double price, Color color, int fontSize)
+        {
+            int lastVisibleBar = Math.Max(0, Math.Min(_robot.Chart.LastVisibleBarIndex, _robot.Bars.Count - 1));
+            var label = _robot.Chart.DrawText(name, text, lastVisibleBar, price, color);
+            label.FontSize = fontSize;
+            label.VerticalAlignment = VerticalAlignment.Center;
+            label.HorizontalAlignment = HorizontalAlignment.Right;
         }
 
         private void DrawPairConnector(PolytrendPair pair, string timeframe, string baseName, Color color,
