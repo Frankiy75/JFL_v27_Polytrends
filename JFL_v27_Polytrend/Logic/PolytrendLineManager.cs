@@ -16,6 +16,7 @@ namespace cAlgo.Robots.JFL_v27_Polytrend
         private readonly int _testedLineWidth;
         private bool _classicMode;
         private int _oldPairStubBars;
+        private int _rightLabelOffsetBars = 10;
         private readonly Dictionary<string, int> _pairColorIndices = new Dictionary<string, int>();
         private static readonly Color[] PairPalette =
         {
@@ -45,10 +46,11 @@ namespace cAlgo.Robots.JFL_v27_Polytrend
             _mtfZigZag = mtfZigZag;
         }
 
-        public void SetVisualOptions(bool classicMode, int oldPairStubBars)
+        public void SetVisualOptions(bool classicMode, int oldPairStubBars, int rightLabelOffsetBars = 10)
         {
             _classicMode = classicMode;
             _oldPairStubBars = oldPairStubBars;
+            _rightLabelOffsetBars = Math.Max(0, rightLabelOffsetBars);
         }
 
         public void ClearTimeFrame(string timeframe)
@@ -193,7 +195,9 @@ namespace cAlgo.Robots.JFL_v27_Polytrend
         private void DrawRightEdgeLabel(string name, string text, double price, Color color, int fontSize)
         {
             int lastVisibleBar = Math.Max(0, Math.Min(_robot.Chart.LastVisibleBarIndex, _robot.Bars.Count - 1));
-            var label = _robot.Chart.DrawText(name, text, lastVisibleBar, price, color);
+            DateTime anchorTime = _robot.Bars.OpenTimes[lastVisibleBar]
+                .AddMinutes(GetTfMinutes(_robot.Bars.TimeFrame.ToString()) * _rightLabelOffsetBars);
+            var label = _robot.Chart.DrawText(name, text, anchorTime, price, color);
             label.FontSize = fontSize;
             label.VerticalAlignment = VerticalAlignment.Center;
             label.HorizontalAlignment = HorizontalAlignment.Right;

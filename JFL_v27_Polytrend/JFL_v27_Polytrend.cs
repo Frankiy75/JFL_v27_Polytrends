@@ -85,6 +85,9 @@ namespace cAlgo.Robots.JFL_v27_Polytrend.JFL_v27_Polytrend
         [Parameter("Tested Line Width", Group = "Draw Lines", DefaultValue = 1, MinValue = 1, MaxValue = 5)]
         public int TestedLineWidth { get; set; }
 
+        [Parameter("Right Label Offset (bars)", Group = "Draw Lines", DefaultValue = 10, MinValue = 0, MaxValue = 100)]
+        public int RightLabelOffsetBars { get; set; }
+
         // --- FILTRO LÍNEAS (TF del gráfico) ---
         [Parameter("Lines Above Price", Group = "Lines Filter", DefaultValue = 3, MinValue = 0, MaxValue = 50)]
         public int LinesAbove { get; set; }
@@ -370,7 +373,7 @@ namespace cAlgo.Robots.JFL_v27_Polytrend.JFL_v27_Polytrend
             _scanner          = new PolytrendScanner(MinimumPolytrendLegAtr,
                 MinimumPolytrendRetracementPercent);
             _lineManager      = new PolytrendLineManager(this, UntestedLineWidth, TestedLineWidth);
-            _lineManager.SetVisualOptions(ClassicMode, OldPairStubAfterBars);
+            _lineManager.SetVisualOptions(ClassicMode, OldPairStubAfterBars, RightLabelOffsetBars);
             _zigZagLineManager = new ZigZagLineManager(this);
             _touchDetector    = new LineTouchDetector(Symbol, TestedLineOffsetPips);
             _stateEngine      = new PolytrendStateEngine(Symbol, UseWicksForGainsLosses, StateChangeOffsetPips);
